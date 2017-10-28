@@ -51,21 +51,23 @@
                 {{ _safeProp(item, 'logger.title') }}
               </div>
               <div class="status-section">
-                <div v-if="item.request">
-                  <Icon type="load-d" class="addon-icon"
-                        v-show="!_safeProp(item, 'response.status')"
-                        color="gray"></Icon>
-                  <Icon type="happy-outline" class="addon-icon"
-                        v-show="_isSuccessStatus(_safeProp(item, 'response.status'))"
-                        :color="_statusColor(_safeProp(item, 'response.status'))"></Icon>
-                  <Icon type="sad-outline" class="addon-icon"
-                        v-show="_safeProp(item, 'response.status') && !_isSuccessStatus(_safeProp(item, 'response.status'))"
-                        :color="_statusColor(_safeProp(item, 'response.status'))"></Icon>
-                </div>
-                <div v-if="item.logger">
-                  <Icon type="android-list" class="addon-icon"
-                        color="#2d8cf0"></Icon>
-                </div>
+                <Tooltip :content="item.createdAt | formatTime" placement="right">
+                  <div v-if="item.request">
+                    <Icon type="load-d" class="addon-icon"
+                          v-show="!_safeProp(item, 'response.status')"
+                          color="gray"></Icon>
+                    <Icon type="happy-outline" class="addon-icon"
+                          v-show="_isSuccessStatus(_safeProp(item, 'response.status'))"
+                          :color="_statusColor(_safeProp(item, 'response.status'))"></Icon>
+                    <Icon type="sad-outline" class="addon-icon"
+                          v-show="_safeProp(item, 'response.status') && !_isSuccessStatus(_safeProp(item, 'response.status'))"
+                          :color="_statusColor(_safeProp(item, 'response.status'))"></Icon>
+                  </div>
+                  <div v-if="item.logger">
+                    <Icon type="android-list" class="addon-icon"
+                          color="#2d8cf0"></Icon>
+                  </div>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -78,8 +80,8 @@
           </CheckboxGroup>
         </div>
         <div class="detail">
-          <Tabs value="Headers">
-            <TabPane label="Headers" name="Headers">
+          <Tabs :value="activeTabPane" :animated="false" @on-click="selectTabPane">
+            <TabPane label="Headers" name="Headers" :disabled="!selectedRequest || isLogger">
               <div class="tab-pane general-pane">
                 <Collapse :value="['1', '2', '3']">
                   <Panel name="1">
@@ -117,7 +119,7 @@
                 </Collapse>
               </div>
             </TabPane>
-            <TabPane label="Request" name="Request">
+            <TabPane label="Request" name="Request" :disabled="!selectedRequest || isLogger">
               <div class="tab-pane request-pane">
                <Collapse :value="['1', '2']">
                   <Panel name="1">
@@ -146,7 +148,7 @@
                 </Collapse>
               </div>
             </TabPane>
-            <TabPane label="Response" name="Response">
+            <TabPane label="Response" name="Response" :disabled="!selectedRequest || isLogger">
               <div class="tab-pane response-pane">
                <Collapse :value="['1']">
                   <Panel name="1">
@@ -163,7 +165,7 @@
                 </Collapse>
               </div>
             </TabPane>
-            <TabPane label="Logger" name="Logger">
+            <TabPane label="Logger" name="Logger" :disabled="!selectedRequest || !isLogger">
               <div class="tab-pane general-pane">
                 <Collapse :value="['1']">
                   <Panel name="1">
@@ -188,95 +190,13 @@
 </template>
 
 <script>
-const DEV = false
 const R = require('ramda')
 const qs = require('qs')
-function isNothing(arg) {
-  return (arg === null || arg === undefined)
-}
-function isSomething(arg) {
-  return !isNothing(arg)
-}
-function cleanReverse(arr) {
-  return arr.concat([]).reverse()
-}
-function safeProp(obj, propsFormat, alt = null) {
-  if (!obj) return alt
-  const props = propsFormat.split('.')
-  let curVal = obj
-  for (let i = 0; i < props.length; i++) {
-    if (isSomething(curVal[props[i]])) {
-      curVal = curVal[props[i]]
-    } else {
-      return alt
-    }
-  }
-  return curVal
-}
-function statusColor(statusCode) {
-  if (!statusCode || statusCode < 200) {
-    return '#2d8cf0'
-  } else if (statusCode >= 200 && statusCode < 400) {
-    return '#19be6b'
-  } else if (statusCode >= 400 && statusCode < 500) {
-    return '#ff9900'
-  } else {
-    return '#ed3f14'
-  }
-}
-function statusText(statusCode) {
-  const code = {
-    '100': 'Continue',
-    '101': 'Switching Protocols',
-    '200': 'OK',
-    '201': 'Created',
-    '202': 'Accepted',
-    '203': 'Non-Authoritative Information',
-    '204': 'No Content',
-    '205': 'Reset Content',
-    '206': 'Partial Content',
-    '300': 'Multiple Choices',
-    '301': 'Moved Permanently',
-    '302': 'Found',
-    '303': 'See Other',
-    '304': 'Not Modified',
-    '305': 'Use Proxy',
-    '307': 'Temporary Redirect',
-    '400': 'Bad Request',
-    '401': 'Unauthorized',
-    '402': 'Payment Required',
-    '403': 'Forbidden',
-    '404': 'Not Found',
-    '405': 'Method Not Allowed',
-    '406': 'Not Acceptable',
-    '407': 'Proxy Authentication Required',
-    '408': 'Request Timeout',
-    '409': 'Conflict',
-    '410': 'Gone',
-    '411': 'Length Required',
-    '412': 'Precondition Failed',
-    '413': 'Request Entity Too Large',
-    '414': 'Request-UTI Too Long',
-    '415': 'Unsupported Media Type',
-    '416': 'Requested Range Not Satisfiable',
-    '417': 'Expectation Failed',
-    '500': 'Internal Server Error',
-    '501': 'Not Implemented',
-    '502': 'Bad GateWay',
-    '503': 'Service Unavailable',
-    '504': 'Gateway Timeout',
-    '505': 'HTTP Version Not Supported',
-  }
-  if (statusCode) {
-    return code[String(statusCode)]
-  } else {
-    return 'Invalid Status Code'
-  }
-}
-let cache = {
-  users: [],
-  apps: [],
-}
+const moment = require('moment')
+const { isNothing, isSomething, safeProp, statusText, statusColor, cleanReverse } = require('../utils')
+
+let cache = { users: [], apps: [] }
+
 export default {
   name: 'RequestWatcher',
   data () {
@@ -287,7 +207,9 @@ export default {
         keyword: '',
         labels: [],
       },
-      currentSortDirection: false,
+      activeTabPane: 'Headers',
+      lastActivePane: 'Headers',
+      currentSortDirection: true,
       allRequests: [],
       selectedRequest: null
     }
@@ -339,7 +261,17 @@ export default {
       let requests = this.allRequests.filter(item => {
         if (!username || item.username !== username) return false
         if (!appname || item.appname !== appname) return false
-        if (keyword !== '' && !~item.request.url.indexOf(keyword)) return false
+        if (keyword !== '') {
+          let loggerTitle = safeProp(item, 'logger.title')
+          let requestUrl = safeProp(item, 'request.url')
+          if (loggerTitle && !!~loggerTitle.indexOf(keyword)) {
+            return true
+          } else if (requestUrl && !!~requestUrl.indexOf(keyword)) {
+            return true
+          } else {
+            return false
+          }
+        }
         for (let i = 0; i < labels.length; i++) {
           let mustContainLabel = labels[i]
           if (!~item.labels.indexOf(mustContainLabel)) return false
@@ -398,13 +330,16 @@ export default {
       } else {
         return cleanReverse(this.filteredRequests)
       }
+    },
+    isLogger() {
+      return !!safeProp(this.selectedRequest, 'logger')
     }
 
   },
   methods: {
     _splitUrl(url) {
       if (!url) {
-        url = 'http://unknown'
+        url = 'http://undefined'
       }
       let simplyfiedUrl = url.replace(/http:\/\/|https:\/\//, '')
       let urlParts = simplyfiedUrl.split('/')
@@ -433,7 +368,19 @@ export default {
       return (status && status >= 200 && status < 400)
     },
     selectRequest(item) {
+      if (item.logger) { // Logger Type
+        this.activeTabPane = 'Logger'
+      } else {
+        this.activeTabPane = this.lastActivePane
+      }
       this.selectedRequest = item
+    },
+    selectTabPane(paneName) {
+      if (paneName !== 'Logger') {
+        this.activeTabPane = this.lastActivePane = paneName
+      } else {
+        this.activeTabPane = paneName
+      }
     },
     showInConsole(data) {
       data = JSON.parse(JSON.stringify(data))
@@ -448,105 +395,17 @@ export default {
       this.currentSortDirection = !this.currentSortDirection
     }
   },
+  filters: {
+    formatTime(time) {
+      return moment(time).format('YYYY/MM/DD HH:mm:ss')
+    }
+  },
   mounted() {
     const vm = this
+
     // mock
-    if (DEV) {
-      this.allRequests = [
-        {
-          uuid: '1',
-          username: 'lisiur',
-          appname: 'appname',
-          labels: ['GET', 'INDEX'],
-          request: {
-            method: 'GET',
-            url: 'http://lisiur.com?a=1&a=2&b=1',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            params: {
-              id: 1,
-            },
-          },
-          response: {
-            status: 200,
-            message: '',
-            headers: [],
-            data: {
-              code: '1',
-              datas: [{
-                name: 'lisiur',
-                test: [{
-                  test: [{
-                    test: 'test'
-                  }]
-                }]
-              }]
-            }
-          },
-        },
-        {
-          uuid: '4',
-          username: 'lisiur',
-          appname: 'appname',
-          labels: ['GET', 'INDEX'],
-          request: {
-            method: 'GET',
-            url: 'http://lisiur.com/test?a=1&a=2&b=1',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            params: {
-              id: 1,
-              __emit_uuid__: 'test_emit_uuid'
-            },
-          },
-          response: {
-            status: 200,
-            message: '',
-            headers: [],
-            data: {
-              code: '1',
-              datas: [{
-                name: 'lisiur',
-                test: [{
-                  test: [{
-                    test: 'test'
-                  }]
-                }]
-              }]
-            }
-          },
-        },
-        {
-          uuid: '2',
-          username: 'lisiur',
-          appname: 'appname',
-          labels: ['log'],
-          logger: {
-            title: 'log title',
-            content: {
-              content: {
-                content: {
-                  content: {
-                    content: 'content'
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          uuid: '3',
-          username: 'lisiur',
-          appname: 'appname',
-          labels: ['log'],
-          logger: {
-            title: 'log title',
-            content: 0
-          }
-        }
-      ]
+    if (process.env.NODE_ENV === 'development') {
+      this.allRequests = require('../mock-data')
     }
     // end mock
 

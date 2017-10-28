@@ -11,7 +11,7 @@ module.exports = {
     // index: path.resolve(__dirname, '../dist/index.html'),
     index: path.resolve(__dirname, '../../request-watcher-server/www/index.html'),
     // assetsRoot: path.resolve(__dirname, '../dist'),
-    assetsRoot: path.resolve(__dirname, '../../request-watcher-server/server/www'),
+    assetsRoot: path.resolve(__dirname, '../../request-watcher-server/www'),
     assetsSubDirectory: 'static',
     assetsPublicPath: '/',
     productionSourceMap: true,
